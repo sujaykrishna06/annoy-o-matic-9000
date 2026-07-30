@@ -1,5 +1,5 @@
 """
-Apple-inspired Glassmorphism UI Widget built with PyQt6, DWM Acrylic Blur, and specular gradient highlights.
+Apple-inspired Glassmorphism UI Widget built with PyQt6, DWM Acrylic Blur, and hardware DWM rounded corners.
 """
 import sys
 import time
@@ -9,11 +9,10 @@ import pyautogui
 
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import (
-    QColor, QPainter, QPen, QBrush, QLinearGradient, QFont, QCursor,
-    QPainterPath, QRegion
+    QColor, QPainter, QPen, QBrush, QLinearGradient, QFont, QCursor
 )
 from PyQt6.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QTextEdit, QComboBox, QDoubleSpinBox, QSpinBox, QPushButton, QFrame
 )
 
@@ -24,13 +23,14 @@ except ImportError:
     PYNPUT_AVAILABLE = False
 
 from annoy_app.config import (
-    GLASS_TRANSPARENCY_ALPHA, GLASS_COLOR_RGB, CORNER_RADIUS, PRANK_PACKS
+    GLASS_TRANSPARENCY_ALPHA, GLASS_COLOR_RGB, CORNER_RADIUS, PRANK_PACKS, PASTE_ENTER_DELAY_MS
 )
 from annoy_app.core.win32_dwm import (
     enable_windows_acrylic_blur, set_windows_rounded_corners, get_acrylic_bg_color, safe_print
 )
 from annoy_app.core.clipboard import ClipboardGuard
 from annoy_app.core.engine import WorkerSignals, apply_chaos_transform
+from annoy_app.core.window_focus import get_running_chat_apps, focus_and_target_input
 
 
 class AppleGlassCardWidget(QWidget):
@@ -46,6 +46,7 @@ class AppleGlassCardWidget(QWidget):
         self.mode = "letter"
         self.chaos_enabled = False
         self.sent_count = 0
+        self.running_chat_apps = []
 
         # Dragging variables
         self._drag_pos = None
@@ -64,26 +65,15 @@ class AppleGlassCardWidget(QWidget):
         self.signals.request_stop.connect(self.stop_autotyper)
 
         self._setup_ui()
+        self._refresh_target_apps()
         self._start_global_key_listeners()
-
-    def update_window_mask(self):
-        """Applies a smooth rounded rect QRegion mask with 9px curves."""
-        path = QPainterPath()
-        path.addRoundedRect(0.0, 0.0, float(self.width()), float(self.height()), float(CORNER_RADIUS), float(CORNER_RADIUS))
-        region = QRegion(path.toFillPolygon().toPolygon())
-        self.setMask(region)
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        if event.oldSize() != event.size():
-            self.update_window_mask()
 
     def showEvent(self, event):
         super().showEvent(event)
         hwnd = int(self.winId())
+        # Solely rely on DWMWA_WINDOW_CORNER_PREFERENCE hardware rounding (no software setMask)
         enable_windows_acrylic_blur(hwnd, bg_color=get_acrylic_bg_color())
         set_windows_rounded_corners(hwnd)
-        self.update_window_mask()
 
     def paintEvent(self, event):
         """Paints ultra-transparent glass fill & specular edge highlights."""
@@ -124,7 +114,6 @@ class AppleGlassCardWidget(QWidget):
         painter.drawLine(1, r, 1, h - r)
 
     def _setup_ui(self):
-        # Reverted fixed width back to original 380px
         self.setFixedWidth(380)
 
         layout = QVBoxLayout(self)
@@ -173,10 +162,57 @@ class AppleGlassCardWidget(QWidget):
 
         layout.addLayout(header)
 
-        # 2. Prank Pack Selection Row
+        # 2. AUTO FOCUS CHAT APP SELECTION ROW
+        lbl_target = QLabel("TARGET CHAT APP (AUTO FOCUS)")
+        lbl_target.setFont(QFont("Segoe UI", 7, QFont.Weight.Bold))
+        lbl_target.setStyleSheet("color: rgba(255, 255, 255, 0.6);")
+        layout.addWidget(lbl_target)
+
+        app_row = QHBoxLayout()
+        app_row.setSpacing(6)
+
+        self.app_combo = QComboBox()
+        self.app_combo.setFont(QFont("Segoe UI", 9))
+        self.app_combo.setStyleSheet("""
+            QComboBox {
+                background: rgba(0, 0, 0, 0.35);
+                color: #ffffff;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                border-radius: 8px;
+                padding: 4px 8px;
+                font-size: 11px;
+            }
+            QComboBox QAbstractItemView {
+                background: #1a1a20;
+                color: #ffffff;
+                selection-background-color: #0a84ff;
+            }
+        """)
+        app_row.addWidget(self.app_combo)
+
+        btn_refresh_apps = QPushButton("🔄")
+        btn_refresh_apps.setFixedSize(28, 28)
+        btn_refresh_apps.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        btn_refresh_apps.setToolTip("Refresh Running Chat Apps")
+        btn_refresh_apps.setStyleSheet("""
+            QPushButton {
+                background: rgba(0, 0, 0, 0.35);
+                color: #ffffff;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                border-radius: 6px;
+                font-size: 12px;
+            }
+            QPushButton:hover { background: rgba(10, 132, 255, 0.6); }
+        """)
+        btn_refresh_apps.clicked.connect(self._refresh_target_apps)
+        app_row.addWidget(btn_refresh_apps)
+
+        layout.addLayout(app_row)
+
+        # 3. PRANK PACK SELECTION ROW
         lbl_prank = QLabel("SELECT PRANK PACK")
         lbl_prank.setFont(QFont("Segoe UI", 7, QFont.Weight.Bold))
-        lbl_prank.setStyleSheet("color: rgba(255, 255, 255, 0.6);")
+        lbl_prank.setStyleSheet("color: rgba(255, 255, 255, 0.6); margin-top: 2px;")
         layout.addWidget(lbl_prank)
 
         self.prank_combo = QComboBox()
@@ -188,7 +224,7 @@ class AppleGlassCardWidget(QWidget):
                 color: #ffffff;
                 border: 1px solid rgba(255, 255, 255, 0.2);
                 border-radius: 8px;
-                padding: 5px 10px;
+                padding: 4px 8px;
                 font-size: 11px;
             }
             QComboBox QAbstractItemView {
@@ -200,14 +236,14 @@ class AppleGlassCardWidget(QWidget):
         self.prank_combo.currentIndexChanged.connect(self._on_prank_selected)
         layout.addWidget(self.prank_combo)
 
-        # 3. Target Text Section
+        # 4. TARGET TEXT SECTION
         lbl_text = QLabel("TARGET MESSAGE TEXT")
         lbl_text.setFont(QFont("Segoe UI", 7, QFont.Weight.Bold))
         lbl_text.setStyleSheet("color: rgba(255, 255, 255, 0.6); margin-top: 2px;")
         layout.addWidget(lbl_text)
 
         self.text_box = QTextEdit()
-        self.text_box.setFixedHeight(75)
+        self.text_box.setFixedHeight(65)
         self.text_box.setPlainText("sujay")
         self.text_box.setFont(QFont("Consolas", 10))
         self.text_box.setStyleSheet("""
@@ -224,7 +260,7 @@ class AppleGlassCardWidget(QWidget):
         """)
         layout.addWidget(self.text_box)
 
-        # 4. UNIFIED SEGMENTED CONTROL BAR
+        # 5. UNIFIED SEGMENTED CONTROL BAR
         seg_bar = QFrame()
         seg_bar.setStyleSheet("""
             QFrame {
@@ -259,7 +295,7 @@ class AppleGlassCardWidget(QWidget):
         layout.addWidget(seg_bar)
         self._update_seg_styles()
 
-        # 5. Clean Delay Settings Card (Width 380px optimized)
+        # 6. DELAY SETTINGS CARD
         settings_card = QFrame()
         settings_card.setStyleSheet("""
             QFrame {
@@ -347,7 +383,7 @@ class AppleGlassCardWidget(QWidget):
 
         layout.addWidget(settings_card)
 
-        # 6. Chaos Meter & Rank Badge
+        # 7. CHAOS METER & RANK BADGE
         meter_layout = QHBoxLayout()
         lbl_meter = QLabel("CHAOS METER")
         lbl_meter.setFont(QFont("Segoe UI", 7, QFont.Weight.Bold))
@@ -368,7 +404,7 @@ class AppleGlassCardWidget(QWidget):
         self.meter_bar.setStyleSheet("background: rgba(0,0,0,0.3); border-radius: 4px;")
         layout.addWidget(self.meter_bar)
 
-        # 7. Status Banner Card
+        # 8. STATUS BANNER CARD
         self.status_card = QFrame()
         self.status_card.setStyleSheet("""
             QFrame {
@@ -380,14 +416,14 @@ class AppleGlassCardWidget(QWidget):
         sc_layout = QHBoxLayout(self.status_card)
         sc_layout.setContentsMargins(8, 6, 8, 6)
 
-        self.status_lbl = QLabel("Ready • Press Start then click target chat")
+        self.status_lbl = QLabel("Ready • Press Start (F5)")
         self.status_lbl.setFont(QFont("Segoe UI", 8, QFont.Weight.Bold))
         self.status_lbl.setStyleSheet("color: #64d2ff; background: transparent;")
         self.status_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         sc_layout.addWidget(self.status_lbl)
         layout.addWidget(self.status_card)
 
-        # 8. Apple Action Buttons (F5=Start, F8=Pause, ESC=Abort)
+        # 9. ACTION BUTTONS (F5=Start, F8=Pause, ESC=Abort)
         btn_layout = QHBoxLayout()
         btn_layout.setSpacing(6)
 
@@ -447,6 +483,20 @@ class AppleGlassCardWidget(QWidget):
         layout.addLayout(btn_layout)
 
         self.adjustSize()
+
+    def _refresh_target_apps(self):
+        """Scans running windows against process executable name whitelist."""
+        self.app_combo.clear()
+        self.running_chat_apps = get_running_chat_apps()
+
+        if self.running_chat_apps:
+            for w in self.running_chat_apps:
+                display_name = f"🟢 {w.exe_name} — {w.title[:22]}" if len(w.title) > 22 else f"🟢 {w.exe_name} — {w.title}"
+                self.app_combo.addItem(display_name, userData=w)
+        else:
+            self.app_combo.addItem("⚠️ No supported chat apps detected", userData=None)
+
+        self.app_combo.addItem("👇 Manual Focus (Countdown Only)", userData="manual")
 
     def _update_seg_styles(self):
         active_style = "background: rgba(10, 132, 255, 0.85); color: #ffffff; border-radius: 7px; border: none; padding: 4px;"
@@ -607,11 +657,14 @@ class AppleGlassCardWidget(QWidget):
         msg_delay = self.delay_spin.value()
         start_countdown = self.countdown_spin.value()
 
-        safe_print(f"[AutoTyper] Starting run: mode={self.mode}, delay={msg_delay}s, countdown={start_countdown}s")
+        # Check selected target chat app for auto-focus
+        target_win = self.app_combo.currentData()
+
+        safe_print(f"[AutoTyper] Starting run: mode={self.mode}, delay={msg_delay}s, countdown={start_countdown}s, target={target_win}")
 
         threading.Thread(
             target=self._run_process,
-            args=(text_content, self.mode, msg_delay, start_countdown, self.chaos_enabled),
+            args=(text_content, self.mode, msg_delay, start_countdown, self.chaos_enabled, target_win),
             daemon=True
         ).start()
 
@@ -620,14 +673,21 @@ class AppleGlassCardWidget(QWidget):
             self.stop_requested = True
             self.signals.update_status.emit("⚠️ Abort Requested...", "#ff453a")
 
-    def _run_process(self, text, mode, msg_delay, start_countdown, chaos_mode):
-        # Countdown Phase: User clicks target chat window during timer
+    def _run_process(self, text, mode, msg_delay, start_countdown, chaos_mode, target_win):
+        # Auto-Focus & UIA Text Field Target Phase
+        if target_win and hasattr(target_win, 'hwnd'):
+            self.signals.update_status.emit(f"🎯 Focusing {target_win.exe_name}...", "#64d2ff")
+            uia_ok, focus_msg = focus_and_target_input(target_win.hwnd, target_win.exe_name)
+            self.signals.update_status.emit(focus_msg, "#30d158" if uia_ok else "#ffd60a")
+            time.sleep(0.5)
+
+        # Countdown Phase
         for remaining in range(start_countdown, 0, -1):
             if self.stop_requested:
                 self.signals.finished.emit("Stopped by user")
                 return
 
-            self.signals.update_status.emit(f"⏳ Select chat! Typing in {remaining}s...", "#ffd60a")
+            self.signals.update_status.emit(f"⏳ Typing in {remaining}s...", "#ffd60a")
             self.signals.trigger_glitch.emit(remaining)
             time.sleep(0.8)
 
@@ -671,6 +731,8 @@ class AppleGlassCardWidget(QWidget):
 
             try:
                 pyautogui.hotkey('ctrl', 'v')
+                # Configurable micro-delay between Paste and Enter (PASTE_ENTER_DELAY_MS = 0.06s)
+                time.sleep(PASTE_ENTER_DELAY_MS)
                 pyautogui.press('enter')
             except pyautogui.FailSafeException:
                 self.signals.finished.emit("🛑 Fail-Safe Triggered! Mouse in corner.")
@@ -686,14 +748,3 @@ class AppleGlassCardWidget(QWidget):
             time.sleep(max(0.01, jitter))
 
         self.signals.finished.emit(f"✅ Sent {total} messages!")
-
-
-def main():
-    app = QApplication(sys.argv)
-    widget = AppleGlassCardWidget()
-    widget.show()
-    sys.exit(app.exec())
-
-
-if __name__ == "__main__":
-    main()

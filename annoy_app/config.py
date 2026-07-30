@@ -4,7 +4,22 @@ Application configuration constants, theme palettes, and prank pack presets.
 
 GLASS_TRANSPARENCY_ALPHA = 0x02  # Ultra transparent glass
 GLASS_COLOR_RGB = (0x12, 0x12, 0x16)  # Dark glass tint RGB
-CORNER_RADIUS = 9  # Decreased corner curvature by 10% for sharp, sleek glass
+CORNER_RADIUS = 9  # DWM 9px corner curvature
+
+# Paste-to-Enter micro-delay (60ms default for reliable Electron/Web chat app processing)
+PASTE_ENTER_DELAY_MS = 0.06
+
+# Whitelist of target chat app executable process names (case-insensitive)
+CHAT_APP_EXECUTABLES = [
+    "WhatsApp.exe",
+    "Discord.exe",
+    "Telegram.exe",
+    "Messenger.exe",
+    "slack.exe",
+    "Teams.exe",
+    "Signal.exe",
+    "skype.exe"
+]
 
 PRANK_PACKS = {
     "Custom Input": None,
