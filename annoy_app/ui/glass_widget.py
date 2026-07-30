@@ -247,14 +247,21 @@ class AppleGlassCardWidget(QWidget):
 
         # 5. DELAY SETTINGS CARD
         settings_card = QFrame()
-        settings_card.setStyleSheet("""
-            QFrame {
+
+        # Resolve arrow SVG paths for Qt stylesheet (must be absolute, forward-slash)
+        import os as _os
+        _assets_dir = _os.path.join(_os.path.dirname(__file__), "assets")
+        _arrow_up = _os.path.join(_assets_dir, "arrow_up.svg").replace("\\", "/")
+        _arrow_down = _os.path.join(_assets_dir, "arrow_down.svg").replace("\\", "/")
+
+        settings_card.setStyleSheet(f"""
+            QFrame {{
                 background: rgba(0, 0, 0, 0.25);
                 border: 1px solid rgba(255, 255, 255, 0.12);
                 border-radius: 10px;
-            }
-            QLabel { color: #ffffff; font-size: 11px; font-weight: 600; }
-            QDoubleSpinBox, QSpinBox {
+            }}
+            QLabel {{ color: #ffffff; font-size: 11px; font-weight: 600; }}
+            QDoubleSpinBox, QSpinBox {{
                 background: rgba(0, 0, 0, 0.45);
                 color: #ffffff;
                 border: 1px solid rgba(255, 255, 255, 0.25);
@@ -262,43 +269,42 @@ class AppleGlassCardWidget(QWidget):
                 padding: 2px 20px 2px 6px;
                 font-weight: bold;
                 height: 26px;
-            }
-            QDoubleSpinBox:focus, QSpinBox:focus {
+            }}
+            QDoubleSpinBox:focus, QSpinBox:focus {{
                 border: 1px solid #0a84ff;
-            }
-            QDoubleSpinBox::up-button, QSpinBox::up-button {
+            }}
+            QDoubleSpinBox::up-button, QSpinBox::up-button {{
                 subcontrol-origin: border;
                 subcontrol-position: top right;
-                width: 18px;
-                height: 12px;
+                width: 20px;
+                height: 13px;
                 border-left: 1px solid rgba(255, 255, 255, 0.2);
-                border-bottom: 1px solid rgba(255, 255, 255, 0.15);
                 border-top-right-radius: 5px;
                 background: rgba(255, 255, 255, 0.12);
-            }
-            QDoubleSpinBox::down-button, QSpinBox::down-button {
+            }}
+            QDoubleSpinBox::down-button, QSpinBox::down-button {{
                 subcontrol-origin: border;
                 subcontrol-position: bottom right;
-                width: 18px;
-                height: 12px;
+                width: 20px;
+                height: 13px;
                 border-left: 1px solid rgba(255, 255, 255, 0.2);
                 border-bottom-right-radius: 5px;
                 background: rgba(255, 255, 255, 0.12);
-            }
+            }}
             QDoubleSpinBox::up-button:hover, QSpinBox::up-button:hover,
-            QDoubleSpinBox::down-button:hover, QSpinBox::down-button:hover {
+            QDoubleSpinBox::down-button:hover, QSpinBox::down-button:hover {{
                 background: rgba(10, 132, 255, 0.7);
-            }
-            QDoubleSpinBox::up-arrow, QSpinBox::up-arrow {
-                image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='5'><polygon points='4,0 8,5 0,5' fill='%23ffffff'/></svg>");
+            }}
+            QDoubleSpinBox::up-arrow, QSpinBox::up-arrow {{
+                image: url({_arrow_up});
                 width: 8px;
                 height: 5px;
-            }
-            QDoubleSpinBox::down-arrow, QSpinBox::down-arrow {
-                image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='5'><polygon points='0,0 8,0 4,5' fill='%23ffffff'/></svg>");
+            }}
+            QDoubleSpinBox::down-arrow, QSpinBox::down-arrow {{
+                image: url({_arrow_down});
                 width: 8px;
                 height: 5px;
-            }
+            }}
         """)
         s_layout = QHBoxLayout(settings_card)
         s_layout.setContentsMargins(10, 8, 10, 8)
@@ -348,11 +354,15 @@ class AppleGlassCardWidget(QWidget):
         meter_layout.addWidget(self.rank_lbl)
         layout.addLayout(meter_layout)
 
-        # Chaos Meter Frame Bar
-        self.meter_bar = QFrame()
-        self.meter_bar.setFixedHeight(8)
-        self.meter_bar.setStyleSheet("background: rgba(0,0,0,0.3); border-radius: 4px;")
-        layout.addWidget(self.meter_bar)
+        # Chaos Meter — Single Smooth Fill Bar
+        self.meter_container = QFrame()
+        self.meter_container.setFixedHeight(8)
+        self.meter_container.setStyleSheet("background: rgba(255,255,255,0.06); border-radius: 4px;")
+        layout.addWidget(self.meter_container)
+
+        self.meter_fill = QFrame(self.meter_container)
+        self.meter_fill.setGeometry(0, 0, 0, 8)
+        self.meter_fill.setStyleSheet("background: #30d158; border-radius: 4px;")
 
         # 7. STATUS BANNER CARD
         self.status_card = QFrame()
@@ -506,6 +516,8 @@ class AppleGlassCardWidget(QWidget):
 
     def _on_update_meter(self, count):
         self.sent_count = count
+
+        # Determine rank + unified bar color
         if count < 10:
             rank, color = "😊 Mild Annoyance", "#30d158"
         elif count < 25:
@@ -520,12 +532,12 @@ class AppleGlassCardWidget(QWidget):
         self.rank_lbl.setText(rank)
         self.rank_lbl.setStyleSheet(f"color: {color};")
 
-        self.meter_bar.setStyleSheet(f"""
-            QFrame {{
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {color}, stop:1 rgba(0,0,0,0.2));
-                border-radius: 4px;
-            }}
-        """)
+        # Fill percentage (0.0 → 1.0, capped at 100 msgs)
+        pct = min(count / 100.0, 1.0)
+        bar_width = int(self.meter_container.width() * pct)
+        self.meter_fill.setFixedWidth(max(bar_width, 2 if count > 0 else 0))
+        self.meter_fill.setFixedHeight(8)
+        self.meter_fill.setStyleSheet(f"background: {color}; border-radius: 4px;")
 
     def _on_trigger_glitch(self, remaining):
         col = random.choice(["#ff453a", "#0a84ff", "#30d158", "rgba(255,255,255,0.2)"])
@@ -581,7 +593,8 @@ class AppleGlassCardWidget(QWidget):
         self.is_running = True
         self.is_paused = False
         self.stop_requested = False
-        self.sent_count = 0
+        self._run_base_count = self.sent_count  # snapshot for cumulative emit
+        # sent_count is NOT reset here — it accumulates across runs until app restart
 
         self._start_glow_timer()
 
@@ -664,7 +677,7 @@ class AppleGlassCardWidget(QWidget):
                 self.signals.finished.emit("🛑 Fail-Safe Triggered! Mouse in corner.")
                 return
 
-            self.signals.update_meter.emit(i)
+            self.signals.update_meter.emit(self._run_base_count + i)
 
             # Humanized Jitter Delay (+/- 35% random variation)
             jitter = msg_delay * random.uniform(0.65, 1.35)
