@@ -1,17 +1,17 @@
 # 😈 Annoy-O-Matic 9000 v2.0
 
-A floating, see-through desktop auto-typer built with **PyQt6** and **Windows 11 DWM Acrylic Blur**. Type messages into any chat app — letter by letter, word by word, or line by line — with prank packs, chaos mode, and a chaos meter that tracks your reign of terror.
+A floating, see-through desktop auto-typer built with **PyQt6** and **Windows 11 DWM Acrylic Blur**. Type messages into any chat app (letter by letter, word by word, or line by line) with prank packs, chaos mode, and a chaos meter that tracks your reign of terror.
 
 ---
 
 ## ✨ Features
 
 ### 🪟 Glassmorphism UI
-- **DWM Acrylic Blur** — Real Windows 11 backdrop blur, not a fake overlay.
-- **Hardware Rounded Corners** — Native `DWMWA_WINDOW_CORNER_PREFERENCE` clipping (no software masking artifacts).
-- **Specular Highlights** — Painted top and left edge light refractions over ultra-transparent glass (`0x02` alpha).
-- **macOS Traffic Lights** — Close (red), Minimize (yellow), Pin (green) header dots.
-- **Always-On-Top + Draggable** — Frameless floating window you can drag anywhere.
+- **DWM Acrylic Blur**: Real Windows 11 backdrop blur, not a fake overlay.
+- **Hardware Rounded Corners**: Native `DWMWA_WINDOW_CORNER_PREFERENCE` clipping (no software masking artifacts).
+- **Specular Highlights**: Painted top and left edge light refractions over ultra-transparent glass (`0x02` alpha).
+- **macOS Traffic Lights**: Close (red), Minimize (yellow), Pin (green) header dots.
+- **Always-On-Top + Draggable**: Frameless floating window you can drag anywhere.
 
 ### ⌨️ Typing Modes
 | Mode | What it does |
@@ -29,14 +29,14 @@ Toggle **Chaos: ON** to randomly transform outgoing text with:
 
 ### 📦 Prank Packs
 Pre-loaded text packs selectable from a dropdown:
-- **🤡 Emoji Flood** — 35 rapid-fire emojis
-- **(╯°□°)╯ Kaomoji Spam** — 10 classic text faces (auto-switches to Line mode)
-- **📦 ASCII Art Block** — Cat face and emoji art blocks
-- **📢 Escalating CAPS** — Passive-aggressive message escalation
-- **Custom Input** — Write your own message
+- **🤡 Emoji Flood**: 35 rapid-fire emojis
+- **(╯°□°)╯ Kaomoji Spam**: 10 classic text faces (auto-switches to Line mode)
+- **📦 ASCII Art Block**: Cat face and emoji art blocks
+- **📢 Escalating CAPS**: Passive-aggressive message escalation
+- **Custom Input**: Write your own message
 
 ### 📊 Chaos Meter
-A smooth progress bar that fills from 0% → 100% as you send messages:
+A smooth progress bar that fills from 0% to 100% as you send messages:
 
 | Messages | Rank | Bar Color |
 |----------|------|-----------|
@@ -47,17 +47,17 @@ A smooth progress bar that fills from 0% → 100% as you send messages:
 | 100+ | 👑 GOD OF TROLLING | 🟣 Purple |
 
 - The **entire bar** shifts to the current tier's color (unified, no segments).
-- Count **persists across runs** — only resets when you close the app.
+- Count **persists across runs**. Only resets when you close the app.
 
 ### 🛡️ Clipboard Protection
-- **Auto Backup** — Saves your clipboard before typing starts.
-- **Auto Restore** — Restores your original clipboard when typing finishes.
-- **Lock Retry** — Retries clipboard operations up to 3× to handle transient Win32 clipboard locks.
+- **Auto Backup**: Saves your clipboard before typing starts.
+- **Auto Restore**: Restores your original clipboard when typing finishes.
+- **Lock Retry**: Retries clipboard operations up to 3× to handle transient Win32 clipboard locks.
 
 ### ⚡ Performance
-- **Zero-CPU Idle** — The glow animation timer is completely stopped when not typing.
-- **Humanized Jitter** — ±35% random delay variation with 5% chance of extra pause for natural-feeling typing.
-- **60ms Paste-Enter Delay** — Tuned for Electron-based chat apps (Discord, WhatsApp Web).
+- **Zero-CPU Idle**: The glow animation timer is completely stopped when not typing.
+- **Humanized Jitter**: ±35% random delay variation with 5% chance of extra pause for natural-feeling typing.
+- **60ms Paste-Enter Delay**: Tuned for Electron-based chat apps (Discord, WhatsApp Web).
 
 ### ⌨️ Global Hotkeys
 | Key | Action |
@@ -66,7 +66,7 @@ A smooth progress bar that fills from 0% → 100% as you send messages:
 | `F8` | Pause / Resume |
 | `ESC` | Emergency abort |
 
-Works globally via `pynput` — no need to focus the app window.
+Works globally via `pynput`. No need to focus the app window.
 
 ---
 
@@ -78,7 +78,7 @@ annoy_app/
 ├── config.py                # Constants, themes, prank packs, chat app whitelist
 ├── core/
 │   ├── win32_dwm.py         # DWM acrylic blur + rounded corner Win32 APIs
-│   ├── clipboard.py         # ClipboardGuard — backup, retry, restore
+│   ├── clipboard.py         # ClipboardGuard: backup, retry, restore
 │   ├── engine.py            # WorkerSignals + chaos text transforms
 │   └── window_focus.py      # Chat app window focus utilities
 └── ui/
@@ -124,12 +124,12 @@ python main.py
 
 ## 🎮 How to Use
 
-1. **Launch** → `python main.py`
+1. **Launch**: `python main.py`
 2. **Pick a prank pack** or type your own message
-3. **Choose a mode** — Letter, Word, or Line
+3. **Choose a mode**: Letter, Word, or Line
 4. **Toggle Chaos** if you want random text transforms
-5. **Set delays** — message delay and start countdown
-6. **Click Start (F5)** → quickly click into your target chat window during the countdown
+5. **Set delays**: message delay and start countdown
+6. **Click Start (F5)**, then quickly click into your target chat window during the countdown
 7. Watch the chaos meter fill up as messages fly 🔥
 8. **F8** to pause, **ESC** to abort at any time
 
